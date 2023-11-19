@@ -843,3 +843,99 @@ Register-ArgumentCompleter -Native -CommandName "crystal" -ScriptBlock {
     return ConvertTo-CompletionResult -Source ($tmp) -Filter $wordToCmp
   }
 }
+
+
+# ------ Openssl -----------------------
+
+function Get-OpensslCommands
+{
+  [OutputType([hashtable])]
+  param(
+  )
+
+  $help_string = openssl --help 2>&1 | Out-String
+  $found = [regex]::new("Standard commands([\s\S]+?)Message Digest commands").Match($help_string).Groups[1].Value
+  $r = [hashtable]::new()
+  $found.Split(" ", [System.StringSplitOptions]::TrimEntries + [StringSplitOptions]::RemoveEmptyEntries) 
+  | ForEach-Object { $r.Add("$_", "$_") }
+  return $r
+}
+
+function Get-OpensslOptions
+{
+  [OutputType([hashtable])]
+  param(
+    [Parameter(Mandatory)]
+    [ArgumentCompleter(
+      {
+        param ( $commandName,
+          $parameterName,
+          $wordToComplete,
+          $commandAst,
+          $fakeBoundParameters )
+        return ConvertTo-CompletionResult -Source (Get-OpensslCommands) -Filter $wordToCmp
+      }
+    )]
+    [string]$Command
+  )
+
+  $help_string = Invoke-Expression -Command "openssl $Command --help 2>&1" | Out-String
+  $r = Get-Options -HelpString $help_string `
+    -OptionLinePattern "^\s{1}(\-[\w\-\?@]+).+$"
+
+  if($Command -eq 'enc')
+  {
+    Get-OpensslCiphers | ForEach-Object { $r.Add("$_","$_") }
+  } elseif ($Command -eq 'dgst')
+  {
+    Get-OpensslDigests | ForEach-Object { $r.Add("$_","$_") }
+  }
+  return $r
+}
+
+function Get-OpensslCiphers 
+{
+  [OutputType([string[]])]
+  param()
+
+  $help_string = openssl enc -list 2>&1 | Out-String
+  $found = [regex]::new("Supported ciphers:([\s\S]+)").Match($help_string).Groups[1].Value
+  $found.Split(" ", [System.StringSplitOptions]::TrimEntries + [System.StringSplitOptions]::RemoveEmptyEntries)
+}
+
+function Get-OpensslDigests
+{
+  [OutputType([string[]])]
+  param()
+
+  $help_string = openssl dgst -list 2>&1 | Out-String
+  $found = [regex]::new("Supported digests:([\s\S]+)").Match($help_string).Groups[1].Value
+  $found.Split(" ", [System.StringSplitOptions]::TrimEntries + [System.StringSplitOptions]::RemoveEmptyEntries)
+}
+
+Register-ArgumentCompleter -Native -CommandName "openssl" -ScriptBlock {
+  param($wordToCmp, $ast, $cursorPos)
+
+  # 从 tokens 中 find commands
+  $tokens = Get-TokensWithoutWordToComplete -AstString "$ast" -WordToComplete $wordToCmp -CursorPos $cursorPos
+  $commands = Get-OpensslCommands
+  foreach ($token in $tokens)
+  {
+    if($commands.ContainsKey($token))
+    {
+      $command = $token
+      break
+    }
+  }
+
+  # complete command
+  if($null -eq $command)
+  {
+    return ConvertTo-CompletionResult -Source ($commands) -Filter $wordToCmp
+  }
+  # complete option
+  if($wordToCmp.StartsWith("-") )
+  {
+    return ConvertTo-CompletionResult -Source (Get-OpensslOptions -Command $command) -Filter $wordToCmp
+  }
+}

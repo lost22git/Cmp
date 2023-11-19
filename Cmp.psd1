@@ -5,13 +5,13 @@
   Author            = 'lost.posh'
   CompanyName       = 'Community'
   Copyright         = 'MIT'
-  Description       = 'Cmp'
+  Description       = 'Completer for native commands'
   PowerShellVersion = '5.1'
   RequiredModules = @()
   FunctionsToExport = '*'
   PrivateData       = @{
     PSData = @{
-      Tags         = @('Cmp','util','lost.posh')
+      Tags         = @('Cmp','completer','lost.posh')
       LicenseUri   = ''
       ProjectUri   = ''
       IconUri      = ''
